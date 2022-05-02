@@ -1,0 +1,1278 @@
+//You can load your save for AI vs. AI to continue learning, or you can load your save for Human vs AI to fight your AI.
+
+/*
+graphics stage:
+make mode: ai vs ai more visually appealing
+make mode: human vs human controls closer so arenas can be slightly bigger
+in ai vs ai, add which bot blue is (cornerbot, circlebot, Best red AI from generation ____)
+in ai vs human, only fight the best 8, add an option to be red, to fight a different family, and switch wasd/arrow, and add a scoreboard and a "____ won!"
+in human vs human, add a scoreboard and a "____ won!"
+
+newnet stage:
+make a spinoff
+find and locate all the 111s
+change them (hard)
+make sure it doesnt crash
+*/
+
+//var ais = [];
+var ais = [];
+
+//To copy code, triple click the line in println.
+
+
+//The Program
+{
+//frameRate and noStroke
+frameRate(30);
+noStroke();
+smooth();
+
+//textAlign
+textAlign(CENTER);
+
+//Initializing variables
+{
+//Scene, mode, and anti-bug
+var scene = "Menu";
+var type = 0;
+var lock = false;
+
+//devtools
+var devtools = true;
+
+//How fast the program is running
+var mode = 1;
+
+//Pause
+var paused = false;
+
+//Indexing for saves
+var bigindex = 6;
+
+//Timers
+var ttimer = 0;
+
+//Zero an array
+var zeroarr = function(arr){
+    for(var i = 0; i < arr.length; i++){
+        arr[i] = 0;
+    }
+};
+
+//Bullet damage - works weirdly if over 1
+var dmg = 0.2;
+
+//Stats of AI (location, hp, reflectx, reflecty)
+var aistats = [[1/2, 7/8, 1, 1, 1], [1/2, 1/8, 1, 1, 1]];
+
+//Stats of Bullet (location, direction, unused)
+var bstats = [[1/2, 7/8, 90, 0], [1/2, 1/8, -90, 0]];
+
+//For the menu - Bullet does not have an unused
+var maistats = [[65, 505, 1], [535, 505, 1]];
+var mbstats = [[65, 505, 180], [535, 505, 0]];
+
+//Border
+var borderpush = 0;
+
+//Simulation speed
+var sim = 1;
+var simspeed = 1;
+
+
+//For ai pairing
+var pair = 0;
+
+//Speeds
+var speed = 5/512;
+var bulletspeed = 5/256;
+
+//Generation
+var generation = 1;
+if(ais[0]){
+    generation = ais[0];
+}
+
+//Old bots
+var obotnum = 10;
+if(ais[1]){
+    obotnum = ais[1];
+}
+
+//Number of bots in each family
+var botnum = 16;
+if(ais[2]){
+    botnum = ais[2];
+}
+if(botnum%2 !== 0){
+    throw{
+        message: "botnum must be even",
+        row: 99
+    };
+}
+
+//Number of neurons in each layer - 111
+var inputnum = 8;
+var hiddennum = 6;
+var outputnum = 2;
+if(ais[3]){
+    inputnum = ais[3];
+}
+if(ais[4]){
+    hiddennum = ais[4];
+}
+if(ais[5]){
+    outputnum = ais[5];
+}
+
+//Number of weights in an array - 111
+var netnum = hiddennum * (inputnum + hiddennum + outputnum);
+
+//If ais is edited - 111
+if(ais.length !== 6 + botnum + netnum * (botnum + obotnum) + obotnum && ais.length !== 0){
+    throw{
+        message: "the code does not work, did you try triple-clicking it and copying?",
+        //If you remove this with a broken code, there will be a lot of bugs. Some bugs will crash the program immediately, some will crash the program on generation 1/2/10/100/1910, and some bugs will not be visible but will still damage the performance of the AIs.
+    };
+}
+
+//The queues for the bots
+var family1 = [];
+var family2 = [];
+var obots = [];
+var obotpoints = [];
+var allais = [];
+allais.push(generation);
+allais.push(obotnum);
+allais.push(botnum);
+allais.push(inputnum);
+allais.push(hiddennum);
+allais.push(outputnum);
+allais.push(family1);
+allais.push(family2);
+//allais.push(obots); is later in the code
+//same with obotpoints
+
+//See if game ended
+var end = false;
+
+//Ranking the family1 and family2 bots
+var f1points = [];
+var f2points = [];
+
+for(var i = 0; i < botnum; i++){
+    f1points.push(0);
+    f2points.push(0);
+}
+
+//Initializing the two players
+
+//To allow the hidden layer to add on itself - 111
+var netadd = [];
+for(i = 0; i < hiddennum; i++){
+    netadd.push(0);
+}
+
+var ai1net = [[], [], []];
+var ai2net = [[], [], []];
+
+//Setting up the nets - 111
+for(var i = 0; i < inputnum; i++){
+    ai1net[0].push(0);
+    ai2net[0].push(0);
+}
+for(var i = 0; i < hiddennum; i++){
+    ai1net[1].push(0);
+    ai2net[1].push(0);
+}
+for(var i = 0; i < outputnum; i++){
+    ai1net[2].push(0);
+    ai2net[2].push(0);
+}
+
+}
+
+//Initializing the networks
+
+//Family1
+for(var i = 0; i < botnum; i++){
+    var ainum = floor(random(10));
+    if(ais.length !== 0){
+        ainum = ais[bigindex];
+    }
+    bigindex++;
+    family1.push(ainum);
+}
+
+//Family2 and obots - 111
+for(var repeat = 0; repeat < max(botnum, (ais.length - 6 - botnum - obotnum)/netnum); repeat++){
+    var aiweights = [[],[],[]];
+    for(var i = 0; i < inputnum; i++){
+        aiweights[0].push([]);
+        for(var j = 0; j < hiddennum; j++){
+            aiweights[0][i].push(0);
+        }
+    }
+    for(var i = 0; i < hiddennum; i++){
+        aiweights[1].push([]);
+        for(var j = 0; j < hiddennum; j++){
+            aiweights[1][i].push(0);
+        }
+    }
+    for(var i = 0; i < hiddennum; i++){
+        aiweights[2].push([]);
+        for(var j = 0; j < outputnum; j++){
+            aiweights[2][i].push(0);
+        }
+    }
+    for (var i = 0; i < aiweights.length; i++){
+        for (var j = 0; j < aiweights[i].length; j++){
+            for (var k = 0; k < aiweights[i][j].length; k++){
+                aiweights[i][j][k] = random(-1.5, 1.5);
+                if(ais.length !== 0){
+                    aiweights[i][j][k] = ais[bigindex];
+                }
+                bigindex++;
+            }
+        }
+    }
+    if(repeat < botnum){
+        family2.push(aiweights);
+    }
+    else{
+        obots.push(aiweights);
+    }
+}
+
+//New obots - 111
+if(ais.length === 0){
+    for(var repeat = 0; repeat < 10; repeat++){
+        var aiweights = [[],[],[]];
+        for(var i = 0; i < inputnum; i++){
+            aiweights[0].push([]);
+            for(var j = 0; j < hiddennum; j++){
+                aiweights[0][i].push(0);
+            }
+        }
+        for(var i = 0; i < hiddennum; i++){
+            aiweights[1].push([]);
+            for(var j = 0; j < hiddennum; j++){
+                aiweights[1][i].push(0);
+            }
+        }
+        for(var i = 0; i < hiddennum; i++){
+            aiweights[2].push([]);
+            for(var j = 0; j < outputnum; j++){
+                aiweights[2][i].push(0);
+            }
+        }
+        obots.push(aiweights);
+    }
+}
+allais.push(obots);
+
+//obotpoints
+for(var i = 0; i < obotnum; i++){
+    var ainum = 5;
+    if(ais.length !== 0){
+        ainum = ais[bigindex];
+    }
+    bigindex++;
+    obotpoints.push(ainum);
+}
+allais.push(obotpoints);
+
+//Adding mutated networks - 111
+var addai = function(arr) {
+    var newai = [[],[],[]];
+    for(var i = 0; i < inputnum; i++){
+        newai[0].push([]);
+        for(var j = 0; j < hiddennum; j++){
+            newai[0][i].push(0);
+        }
+    }
+    for(var i = 0; i < hiddennum; i++){
+        newai[1].push([]);
+        for(var j = 0; j < hiddennum; j++){
+            newai[1][i].push(0);
+        }
+    }
+    for(var i = 0; i < hiddennum; i++){
+        newai[2].push([]);
+        for(var j = 0; j < outputnum; j++){
+            newai[2][i].push(0);
+        }
+    }
+    for (var i = 0; i < newai.length; i++){
+        for (var j = 0; j < newai[i].length; j++){
+            for (var k = 0; k < newai[i][j].length; k++){
+                var rv = random(-1, 1);
+                newai[i][j][k] = arr[i][j][k] + rv/(250*(rv*rv-1));
+                newai[i][j][k] = constrain(newai[i][j][k], -1.5, 1.5);
+            }
+        }
+    }
+    return newai;
+};
+
+//Resetting a match after someone wins
+var reset = function() {
+    f1points[pair] = 0;
+    if(round(aistats[0][2] * 100) === 0){
+        f1points[pair] -= (1 - borderpush);
+        f2points[pair] += (1 - borderpush);
+    }
+    if(round(aistats[1][2] * 100) === 0){
+        f1points[pair] += (1 - borderpush);
+        f2points[pair] -= (1 - borderpush);
+    }
+    f1points[pair] += round(5 * aistats[0][2] - 5 * aistats[1][2]);
+    f2points[pair] += round(5 * aistats[1][2] - 5 * aistats[0][2]);
+    
+    if(type === 0){
+        if(f1points[pair] > 0){
+            obotpoints[family1[pair]] += 0.2 * max(0, f1points[pair] - 1);
+        }
+        if(f1points[pair] < 0){
+            obotpoints[family1[pair]] *= (1 + 0.05 * min(0 , f1points[pair] + 1));
+        }
+        obotpoints[family1[pair]] = max(obotpoints[family1[pair]], 0.00001);
+    }
+    
+    pair = (pair + 1) % botnum;
+    aistats = [[1/2, 7/8, 1, 1, 1], [1/2, 1/8, 1, 1, 1]];
+    
+    borderpush = 0;
+    bstats = [[1/2, 7/8, 90, 0], [1/2, 1/8, -90, 0]];
+    end = false;
+    for(var i = 0; i < 3; i++){
+        zeroarr(ai1net[i]);
+        zeroarr(ai2net[i]);
+    }
+    if(type === 0){
+        aistats[0][3] = 2 * round(random()) - 1;
+        aistats[1][3] = 2 * round(random()) - 1;
+        //aistats[0][4] = 2 * round(random()) - 1;
+        //aistats[1][4] = 2 * round(random()) - 1;
+    }
+};
+
+//Batch normalization
+var bnorm = function(arr){
+    var len = arr.length;
+    var sum = 0;
+    for(var i = 0; i < len; i++){
+        sum += arr[i];
+    }
+    var mean = sum/len;
+    sum = 0;
+    for(var i = 0; i < len; i++){
+        sum += (arr[i] - mean) * (arr[i] - mean);
+    }
+    var sdev = sqrt(sum/len);
+    for(var i = 0; i < len; i++){
+        arr[i] = (arr[i] - mean)/sdev;
+    }
+};
+
+//Merge Sort - An O(nlog(n)) sort, good enough
+var merge = function(arr, p, q, r){
+    var left = [];
+    var right = [];
+    
+    var leftn = q - p + 1;
+    var rightn = r - q;
+    
+    for(var i = 0; i < leftn; i++){
+        left.push(arr[p + i]);
+    }
+    for(var i = 0; i < rightn; i++){
+        right.push(arr[q + i + 1]);
+    }
+    
+    var totali = p;
+    var i = 0;
+    var j = 0;
+    
+    while(i < leftn && j < rightn){
+        if(left[i] <= right[j]){
+            arr[totali] = left[i];
+            i++;
+        }
+        else{
+            arr[totali] = right[j];
+            j++;
+        }
+        totali++;
+    }
+    
+    while(i < leftn){
+        arr[totali] = left[i];
+        i++;
+        totali++;
+    }
+    while(j < rightn){
+        arr[totali] = right[j];
+        j++;
+        totali++;
+    }
+};
+var msort = function(arr, p, r){
+    if(p < r){
+        var q = floor((p + r - 1)/2);
+        msort(arr, p, q);
+        msort(arr, q + 1, r);
+        merge(arr, p, q, r);
+    }
+};
+
+//Double Merge Sort - Sort one array by another
+var doublemerge = function(arr, otherarr, p, q, r){
+    var left = [];
+    var right = [];
+    var left2 = [];
+    var right2 = [];
+    
+    var leftn = q - p + 1;
+    var rightn = r - q;
+    
+    for(var i = 0; i < leftn; i++){
+        left.push(arr[p + i]);
+        left2.push(otherarr[p + i]);
+    }
+    for(var i = 0; i < rightn; i++){
+        right.push(arr[q + i + 1]);
+        right2.push(otherarr[q + i + 1]);
+    }
+    
+    var totali = p;
+    var i = 0;
+    var j = 0;
+    
+    while(i < leftn && j < rightn){
+        if(left[i] <= right[j]){
+            arr[totali] = left[i];
+            otherarr[totali] = left2[i];
+            i++;
+        }
+        else{
+            arr[totali] = right[j];
+            otherarr[totali] = right2[j];
+            j++;
+        }
+        totali++;
+    }
+    
+    while(i < leftn){
+        arr[totali] = left[i];
+        otherarr[totali] = left2[i];
+        i++;
+        totali++;
+    }
+    while(j < rightn){
+        arr[totali] = right[j];
+        otherarr[totali] = right2[j];
+        j++;
+        totali++;
+    }
+};
+var doublemsort = function(arr, otherarr, p, r){
+    if(p < r){
+        var q = floor((p + r - 1)/2);
+        doublemsort(arr, otherarr, p, q);
+        doublemsort(arr, otherarr, q + 1, r);
+        doublemerge(arr, otherarr, p, q, r);
+    }
+};
+
+//New generation
+var superreset = function() {
+    var family1win = [];
+    var family2win = [];
+    for(var i = 0; i < botnum; i++){
+        family1win.push([]);
+        family2win.push([]);
+    }
+    
+    doublemsort(f1points, family1, 0, botnum - 1);
+    doublemsort(f2points, family2, 0, botnum - 1);
+    if(generation%10 === 0){
+        if(obotnum < 200){
+            obots.push(family2[botnum - 1]);
+            obotpoints.push(5);
+            obotnum++;
+        }
+        else{
+            var lowest = 0;
+            var lowestnum = -1;
+            for(var i = 10; i < obotnum; i++){
+                if(obotpoints[i] < lowestnum || lowestnum === -1){
+                    lowest = i;
+                    lowestnum = obotpoints[i];
+                }
+            }
+            obots[lowest] = family2[botnum - 1];
+            obotpoints[lowest] = 5;
+        }
+        if(obotnum !== obots.length){
+            throw{
+                message: "obotnum is not rematchbots.length",
+            };
+        }
+        if(obotnum !== obotpoints.length){
+            throw{
+                message: "obotnum is not obotpoints.length",
+            };
+        }
+    }
+    
+    var pointsum = 0;
+    for(var i = 0; i < obotpoints.length; i++){
+        pointsum++;
+        pointsum += obotpoints[i];
+    }
+    
+    //Make the next family1
+    for(var i = 0; i < botnum/2; i++){
+        //Keep bot from before
+        var winnerbot = family1[botnum - 1 - i];
+        family1win[i] = winnerbot;
+        
+        //Add a new bot
+        var targetnum = random(pointsum);
+        var pointsum2 = 0;
+        for(var j = 0; j < obotpoints.length; j++){
+            pointsum2++;
+            pointsum2 += obotpoints[j];
+            if(targetnum < pointsum2){
+                break;
+            }
+        }
+        family1win[i + botnum/2] = j;
+    }
+    
+    //Make next family2 (in reverse order so old fights new)
+    for(var i = 0; i < botnum/2; i++){
+        //Keep bot from before
+        var winnerbot = family2[botnum - 1 - i];
+        family2win[botnum - 1 - i] = winnerbot;
+        
+        //Add a new bot
+        family2win[botnum - botnum/2 - 1 - i] = addai(winnerbot);
+    }
+    
+    family1 = family1win;
+    family2 = family2win;
+    //println(family1);
+    zeroarr(f1points);
+    zeroarr(f2points);
+    
+    generation++;
+    allais = [];
+    allais.push(generation);
+    allais.push(obotnum);
+    allais.push(botnum);
+    allais.push(inputnum);
+    allais.push(hiddennum);
+    allais.push(outputnum);
+    allais.push(family1);
+    allais.push(family2);
+    allais.push(obots);
+    allais.push(obotpoints);
+    
+    if(generation % 100 === 1){
+        frameRate(1);
+        simspeed = -1;
+        println(allais);
+    }
+    
+};
+
+//How the neural networks operate - 111
+var aioutput = function(ainum, arrnet, arrweight) {
+    
+    //input to hidden
+    for(var i = 0; i < inputnum; i++){
+        for(var j = 0; j < hiddennum; j++){
+            arrnet[1][j] += arrnet[0][i] * arrweight[0][i][j];
+        }
+    }
+    
+    //hidden to hidden
+    zeroarr(netadd);
+    for(var i = 0; i < hiddennum; i++){
+        for (var j = 0; j < hiddennum; j++){
+            netadd[j] += arrnet[1][i] * arrweight[1][i][j];
+        }
+    }
+    for(var i = 0; i < hiddennum; i++){
+        arrnet[1][i] += netadd[i];
+    }
+    bnorm(arrnet[1]);
+    for(var i = 0; i < hiddennum; i++){
+        arrnet[1][i] = max(arrnet[1][i], 0);
+    }
+    
+    //hidden to output
+    for(var i = 0; i < hiddennum; i++){
+        for(var j = 0; j < outputnum; j++){
+            arrnet[2][j] += arrnet[1][i] * arrweight[2][i][j];
+        }
+    }
+    
+    if(arrnet[2][0] < -0.2){
+        aistats[ainum][0] -= speed * aistats[ainum][3] * (2 * ainum - 1);
+    }
+    if(arrnet[2][0] > 0.2){
+        aistats[ainum][0] += speed * aistats[ainum][3] * (2 * ainum - 1);
+    }
+    if(arrnet[2][1] < -0.2){
+        aistats[ainum][1] -= speed * aistats[ainum][4] * (2 * ainum - 1);
+    }
+    if(arrnet[2][1] > 0.2){
+        aistats[ainum][1] += speed * aistats[ainum][4] * (2 * ainum - 1);
+    }
+    
+    if(simspeed === sim && (frameCount%10 === 0 || mode < 3) && type === 0){
+        if(ainum === 0){
+            fill(0, 0, 255);
+            rect(600 * aistats[ainum][0] - 50 * arrnet[2][0] * aistats[ainum][3], 600 * aistats[ainum][1] - 50 * arrnet[2][1] * aistats[ainum][4] - 5, 10, 10);
+            
+        }
+        else{
+            fill(255, 0, 0);
+            rect(600 * aistats[ainum][0] + 50 * arrnet[2][0] * aistats[ainum][3] - 5, 600 * aistats[ainum][1] + 50 * arrnet[2][1] * aistats[ainum][4] - 5, 10, 10);
+        }
+    }
+    
+};
+
+//What pressing the keys do
+var keys = [];
+var keyPressed = function() {
+    keys[keyCode] = true;
+};
+var keyReleased = function() {
+    if(keyCode === 79 && type === 0 && scene === "Play"){
+        frameRate(1);
+        simspeed = -1;
+        println(allais);
+    }
+    if(keyCode === 80 && !paused && scene === "Play"){
+        paused = true;
+        fill(100, 100);
+        rect(0, 0, 600, 600);
+        fill(0);
+        textSize(50);
+        text("Paused", 300, 300);
+        noLoop();
+    }
+    else if(keyCode === 80 && paused && scene === "Play"){
+        paused = false;
+        loop();
+    }
+    keys[keyCode] = false;
+};
+
+//Draw players
+var player1 = function(x, y, h){
+    fill(50, 50, 100);
+    rect(600 * x - 10, 600 * y - 10, 20, 20);
+    fill(60, 100, 250);
+    rect(600 * x - 7, 600 * y - 3, 14, 6);
+    rect(600 * x - 3, 600 * y - 7, 6, 14);
+    fill(60, 100, 250, 150);
+    rect(600 * x - 20 * h, 600 * y - 30, 40 * h, 10);
+};
+var player2 = function(x, y, h){
+    fill(100, 50,50);
+    rect(600 * x - 10, 600 * y - 10, 20, 20);
+    fill(250, 60, 60);
+    rect(600 * x - 7,600 * y - 3, 14, 6);
+    rect(600 * x - 3,600 * y - 7, 6, 14);
+    fill(250, 60, 60, 150);
+    rect(600 * x - 20 * h, 600 * y - 30, 40 * h, 10);
+};
+
+//Draw bullets
+var bullet1 = function(x, y){
+    fill(60, 100, 250);
+    ellipse(600 * x, 600 * y, 6, 6);
+};
+var bullet2 = function(x, y){
+    fill(250, 50, 50);
+    ellipse(600 * x, 600 * y, 6, 6);
+};
+
+//Mouse interactions - FIX BUTTONS
+mouseClicked = function() {
+    if (scene === "Menu" && mouseX > 240 && mouseX < 360 && mouseY > 190 && mouseY < 270 && ttimer === 0){
+        ttimer = 120;
+    }
+    if (scene === "Menu" && mouseX > 140 && mouseX < 460 && mouseY > 290 && mouseY < 370 && ttimer === 0){
+        type = (type + 1) % 3;
+        maistats = [[65, 505, 1], [535, 505, 1]];
+        mbstats = [[65, 505, 180], [535, 505, 0]];
+    }
+};
+
+draw = function() {
+    
+    //Lock is if bad things happen
+    if(!lock){
+        
+        //Menu scene
+        if(scene === "Menu"){
+            background(200);
+            textSize(25);
+            
+            //Start button
+            pushMatrix();
+            var fillshade = 0;
+            translate(300, 230);
+            if(mouseX > 240 && mouseX < 360 && mouseY > 190 && mouseY < 270){
+                scale(1.05);
+                fillshade = 30;
+                if(mouseIsPressed){
+                    fillshade = 10;
+                }
+            }
+            translate(-300, -230);
+            fill(120 + fillshade);
+            rect(240, 190, 120, 80, 30);
+            fill(160 + fillshade);
+            rect(250, 200, 100, 60, 20);
+            popMatrix();
+            
+            //Mode Button
+            pushMatrix();
+            var fillshade = 0;
+            translate(300, 330);
+            if(mouseX > 140 && mouseX < 460 && mouseY > 290 && mouseY < 370){
+                scale(1.05);
+                fillshade = 30;
+                if(mouseIsPressed){
+                    fillshade = 10;
+                }
+            }
+            translate(-300, -330);
+            fill(120 + fillshade);
+            rect(140, 290, 320, 80, 30);
+            fill(160 + fillshade);
+            rect(150, 300, 300, 60, 20);
+            popMatrix();
+            
+            //Text shown
+            fill(0);
+            if (type === 0){
+                text("Mode: AI vs. AI", 300, 340);
+                textSize(20);
+                text("Controls:\n\n\"1\" to slow down, \"2\" for normal speed, \"3\" for fast speed\n\"4\" for training the AIs (super speed)\n\n\"o\" to println all the AIs\n\"p\" to pause\nI'm going to make a visual 111\n(I mark \"111\" at places I need to change)", 300, 400);
+            }
+            if (type === 1){
+                text("Mode: Human vs. AI", 300, 340);
+                textSize(20);
+                text("Controls:\n\n\n\n\n\n\nPlayer 1", 300, 400);
+                //WASD
+                stroke(50, 50, 100);
+                strokeWeight(5);
+                fill(100, 120, 255);
+                rect(280, 480, 40, 40, 5);
+                rect(280, 430, 40, 40, 5);
+                rect(230, 480, 40, 40, 5);
+                rect(330, 480, 40, 40, 5);
+                fill(0);
+                text("W", 300, 460);
+                text("A", 250, 510);
+                text("S", 300, 510);
+                text("D", 350, 510);
+                noStroke();
+            }
+            if (type === 2){
+                text("Mode: Human vs Human", 300, 340);
+                textSize(20);
+                text("Controls:\n\n\n\n\n\n\nPlayer 1                       Player 2", 300, 400);
+                
+                //Arrow Keys
+                stroke(100, 50, 50);
+                strokeWeight(5);
+                fill(250, 120, 100);
+                rect(380, 480, 40, 40, 5);
+                rect(380, 430, 40, 40, 5);
+                rect(330, 480, 40, 40, 5);
+                rect(430, 480, 40, 40, 5);
+                fill(0);
+                text("↑", 400, 455);
+                text("←", 350, 506);
+                text("↓", 400, 505);
+                text("→", 450, 506);
+                
+                //WASD
+                stroke(50, 50, 100);
+                strokeWeight(5);
+                fill(100, 120, 255);
+                rect(180, 480, 40, 40, 5);
+                rect(180, 430, 40, 40, 5);
+                rect(130, 480, 40, 40, 5);
+                rect(230, 480, 40, 40, 5);
+                fill(0);
+                text("W", 200, 460);
+                text("A", 150, 510);
+                text("S", 200, 510);
+                text("D", 250, 510);
+                noStroke();
+            }
+            
+            //Mini arenas 111
+            fill(255);
+            rect(15, 455, 100, 100);
+            rect(485, 455, 100, 100);
+            
+            player1(maistats[0][0]/600, maistats[0][1]/600, maistats[0][2]);
+            player2(maistats[1][0]/600, maistats[1][1]/600, maistats[0][2]);
+            bullet1(mbstats[0][0]/600, mbstats[0][1]/600);
+            bullet2(mbstats[1][0]/600, mbstats[1][1]/600);
+            if(type !== 0){
+                if (keys[87]){
+                    maistats[0][1] -= speed * 600;
+                }
+                if (keys[83]){
+                    maistats[0][1] += speed * 600;
+                }
+                if (keys[68]){
+                    maistats[0][0] += speed * 600;
+                }
+                if (keys[65]){
+                    maistats[0][0] -= speed * 600;
+                }
+            }
+            else{
+                var targetpos = [15 + 100 * (4 * noise(frameCount/17 + 1/13, frameCount/13 + 1/17) - 1.375), 455 + 100 * (4 * noise(frameCount/13 + 1/17, frameCount/17 + 1/13) - 1.375)];
+                if(targetpos[0] - maistats[0][0] < -15){
+                    maistats[0][0] -= speed * 600;
+                }
+                if(targetpos[0] - maistats[0][0] > 15){
+                    maistats[0][0] += speed * 600;
+                }
+                if(targetpos[1] - maistats[0][1] < -15){
+                    maistats[0][1] -= speed * 600;
+                }
+                if(targetpos[1] - maistats[0][1] > 15){
+                    maistats[0][1] += speed * 600;
+                }
+            }
+            if(type === 2){
+                if (keys[UP]){
+                    maistats[1][1] -= speed * 600;
+                }
+                if (keys[DOWN]){
+                    maistats[1][1] += speed * 600;
+                }
+                if (keys[RIGHT]){
+                    maistats[1][0] += speed * 600;
+                }
+                if (keys[LEFT]){
+                    maistats[1][0] -= speed * 600;
+                }
+            }
+            else{
+                var targetpos = [485 + 100 * (4 * noise(frameCount/11 + 1/19, frameCount/19 + 1/11) - 1.375), 455 + 100 * (4 * noise(frameCount/19 + 1/11, frameCount/11 + 1/19) - 1.375)];
+                if(targetpos[0] - maistats[1][0] < -15){
+                    maistats[1][0] -= speed * 600;
+                }
+                if(targetpos[0] - maistats[1][0] > 15){
+                    maistats[1][0] += speed * 600;
+                }
+                if(targetpos[1] - maistats[1][1] < -15){
+                    maistats[1][1] -= speed * 600;
+                }
+                if(targetpos[1] - maistats[1][1] > 15){
+                    maistats[1][1] += speed * 600;
+                }
+            }
+            
+            //Player-Wall collision
+            maistats[0][0] = constrain(maistats[0][0], 25, 105);
+            maistats[0][1] = constrain(maistats[0][1], 465, 545);
+            maistats[1][0] = constrain(maistats[1][0], 495, 575);
+            maistats[1][1] = constrain(maistats[1][1], 465, 545);
+            //Bullet-Wall collision and movement
+            for(var i = 0; i < 2; i++){
+                if((2 * i - 1) * mbstats[i][0] < 185 + (2 * i - 1) * 300){
+                    mbstats[i][0] = maistats[i][0];
+                    mbstats[i][1] = maistats[i][1];
+                    mbstats[i][2] = atan2(maistats[i][1] - maistats[i^1][1], maistats[i][0] - maistats[i^1][0]);
+                }
+                mbstats[i][0] -= 600 * bulletspeed * cos(mbstats[i][2]);
+                mbstats[i][1] -= 600 * bulletspeed * sin(mbstats[i][2]);
+            }
+            
+            fill(0);
+            textSize(30);
+            text("Start", 300, 240);
+            text("Machine Learning with\nNeural Networks", 300, 80);
+            fill(100, 0, 0);
+            textSize(80);
+            pushMatrix();
+            translate(300, 100);
+            rotate(-10);
+            text("NOT DONE", 0, 0);
+            popMatrix();
+            //111
+            
+            //Transition
+            if(ttimer > 0){
+                fill(255, 510 - 255/60 * ttimer);
+                rect(0, 0, 600, 600);
+                ttimer--;
+                if(ttimer <= 60){
+                    scene = "Transition";
+                }
+            }
+        }
+        
+        //The transition
+        if(scene === "Transition"){
+            //frameRate(500);
+            background(255);
+            textSize(25);
+            
+            //Arena walls
+            fill(200);
+            rect(0, 0, 600, 10 + 5 * ttimer);
+            rect(0, 0, 10 + 5 * ttimer,600);
+            rect(0, 590 - 5 * ttimer, 600, 10000);
+            rect(590 - 5 * ttimer, 0, 10000, 600);
+            
+            //Player 1
+            fill(50, 50, 100);
+            rect(290 + ttimer/6, 515 - ttimer * 43/12, (60 - ttimer)/3, (60 - ttimer)/3);
+            fill(60, 100, 250);
+            rect(293 + ttimer * 7/60, 522 - ttimer * 222/60, (60 - ttimer) * 14/60, (60 - ttimer)/10);
+            rect(297 + ttimer * 3/60, 518 - ttimer * 218/60, (60 - ttimer)/10, (60 - ttimer) * 14/60);
+            fill(60, 100, 250, 150);
+            rect(280 + ttimer/3, 495 - ttimer * 13/4, (60 - ttimer) * 2/3, (60 - ttimer)/6);
+            
+            //Player 2
+            fill(100, 50, 50);
+            rect(290 + ttimer/6, 65 + ttimer * 47/12, (60 - ttimer)/3, (60 - ttimer)/3);
+            fill(255, 60, 60);
+            rect(293 + ttimer * 7/60, 72 + ttimer * 228/60, (60 - ttimer) * 14/60, (60 - ttimer)/10);
+            rect(297 + ttimer * 3/60, 68 + ttimer * 232/60, (60 - ttimer)/10, (60 - ttimer) * 14/60);
+            fill(250, 60, 60, 150);
+            rect(280 + ttimer/3, 45 + ttimer * 17/4, (60 - ttimer) * 2/3, (60 - ttimer)/6);
+            
+            //Transition
+            fill(255, 255/60 * ttimer);
+            rect(0, 0, 600, 600);
+            
+            ttimer--;
+            if (ttimer < 0){
+                scene = "Play";
+            }
+        }
+        
+        textSize(15);
+        
+        //play scene
+        if(scene === "Play"){
+            
+            //Simulator speeds
+            if(simspeed === -1){
+                if(mode === 0){
+                    frameRate(10);
+                    simspeed = 1;
+                }
+                if(mode === 1){
+                    frameRate(30);
+                    simspeed = 1;
+                }
+                if(mode === 2){
+                    frameRate(60);
+                    simspeed = 5;
+                }
+                if(mode === 3){
+                    frameRate(max);
+                    simspeed = 500;
+                }
+            }
+            
+            //How many times it runs per frame
+            for(sim = 1; sim <= simspeed; sim++){
+                
+                //Pairing the bots up
+                var ai1weight = obots[family1[pair]];
+                var ai2weight = family2[pair];
+                
+                //Draw arena
+                if(simspeed === sim && (frameCount%10 === 0 || mode < 3)){
+                    background(255);
+                    fill(200);
+                    rect(0, 0, 600, 10 + borderpush * 600);
+                    rect(0, 0, 10 + borderpush * 600,600);
+                    rect(0, 590 - 600 * borderpush, 600, 1000);
+                    rect(590 - 600 * borderpush, 0, 1000, 600);
+                }
+                
+                //Sets inputs of neural net and resetting outputs
+                {
+                ai1net[0][0] = (aistats[1][0] - aistats[0][0]) * aistats[0][3];
+                ai1net[0][1] = (aistats[1][1] - aistats[0][1]) * aistats[0][4];
+                ai1net[0][2] = (1/2 - aistats[0][0]) * aistats[0][3];
+                ai1net[0][3] = (1/2 - aistats[0][1]) * aistats[0][4];
+                ai1net[0][4] = 1;
+                ai1net[0][5] = (bstats[1][0] - aistats[0][0]) * aistats[0][3];
+                ai1net[0][6] = (bstats[1][1] - aistats[0][1]) * aistats[0][4];
+                ai1net[0][7] = borderpush;
+                ai1net[2][0] = 0;
+                ai1net[2][1] = 0;
+                
+                ai2net[0][0] = (aistats[1][0] - aistats[0][0]) * aistats[1][3];
+                ai2net[0][1] = (aistats[1][1] - aistats[0][1]) * aistats[1][4];
+                ai2net[0][2] = (aistats[1][0] - 1/2) * aistats[1][3];
+                ai2net[0][3] = (aistats[1][1] - 1/2) * aistats[1][4];
+                ai2net[0][4] = 1;
+                ai2net[0][5] = (aistats[1][0] - bstats[0][0]) * aistats[1][3];
+                ai2net[0][6] = (aistats[1][1] - bstats[0][1]) * aistats[1][4];
+                ai2net[0][7] = borderpush;
+                ai2net[2][0] = 0;
+                ai2net[2][1] = 0;
+                }
+                //family1[pair] = 9;
+                //Move each bot
+                if(type !== 0){
+                    if (keys[87]){
+                        aistats[0][1] -= speed;
+                    }
+                    if (keys[83]){
+                        aistats[0][1] += speed;
+                    }
+                    if (keys[68]){
+                        aistats[0][0] += speed;
+                    }
+                    if (keys[65]){
+                        aistats[0][0] -= speed;
+                    }
+                }
+                else{
+                    //Bots 0-7 camp corner
+                    //4 corners, 2 dodging patterns each
+                    if(family1[pair] < 8){
+                        var botid = family1[pair];
+                        var vdir = 2 * floor(botid/4) - 1;
+                        var hdir = 2 * (floor(botid/2)%2) - 1;
+                        var bstate = botid%2;
+                        var targetpos = [25 * hdir, 25 * vdir];
+                        aistats[0][0] += speed * hdir;
+                        aistats[0][1] += speed * vdir;
+                        if(dist(aistats[0][0], aistats[0][1], bstats[1][0], bstats[1][1]) < 0.25){
+                            if(bstate === 0 && hdir * bstats[1][0] > hdir * aistats[0][0] - 0.1){
+                                aistats[0][0] -= 2 * speed * hdir;
+                                targetpos[0] *= -1;
+                            }
+                            if(bstate === 1 && vdir * bstats[1][1] > vdir * aistats[0][1] - 0.1){
+                                aistats[0][1] -= 2 * speed * vdir;
+                                targetpos[1] *= -1;
+                            }
+                        }
+                        if(simspeed === sim && (frameCount%10 === 0 || mode < 3)){
+                            fill(0, 0, 255);
+                            rect(600 * aistats[0][0] + targetpos[0] - 5, 600 * aistats[0][1] + targetpos[1] - 5, 10, 10);
+                        }
+                    }
+                    
+                    //Bots 8-9 circle map
+                    //Clockwise vs counterclockwise
+                    else if(family1[pair] < 10){
+                        var botid = family1[pair];
+                        var bstate = 2 * (botid%2) - 1;
+                        var targetpos = [0, 0];
+                        if(aistats[0][0] - (137/4096 + borderpush) < 0.1){
+                            aistats[0][1] += speed * bstate;
+                            targetpos[1] += 50 * bstate;
+                        }
+                        if((3959/4096 - borderpush) - aistats[0][0] < 0.1){
+                            aistats[0][1] -= speed * bstate;
+                            targetpos[1] -= 50 * bstate;
+                        }
+                        if(aistats[0][1] - (137/4096 + borderpush) < 0.1){
+                            aistats[0][0] -= speed * bstate;
+                            targetpos[0] -= 50 * bstate;
+                        }
+                        if((3959/4096 - borderpush) - aistats[0][1] < 0.1){
+                            aistats[0][0] += speed * bstate;
+                            targetpos[0] += 50 * bstate;
+                        }
+                        if(simspeed === sim && (frameCount%10 === 0 || mode < 3)){
+                            fill(0, 0, 255);
+                            rect(600 * aistats[0][0] + targetpos[0] - 5, 600 * aistats[0][1] + targetpos[1] - 5, 10, 10);
+                        }
+                    }
+                    else{
+                        aioutput(0, ai1net, ai1weight);
+                    }
+                }
+                if(type === 2){
+                    if (keys[UP]){
+                        aistats[1][1] -= speed;
+                    }
+                    if (keys[DOWN]){
+                        aistats[1][1] += speed;
+                    }
+                    if (keys[RIGHT]){
+                        aistats[1][0] += speed;
+                    }
+                    if (keys[LEFT]){
+                        aistats[1][0] -= speed;
+                    }
+                }
+                else{
+                    aioutput(1, ai2net, ai2weight);
+                }
+                
+                //Player-Wall interactions
+                aistats[0][0] = constrain(aistats[0][0], 137/4096 + borderpush, 3959/4096 - borderpush);
+                aistats[0][1] = constrain(aistats[0][1], 137/4096 + borderpush, 3959/4096 - borderpush);
+                aistats[1][0] = constrain(aistats[1][0], 137/4096 + borderpush, 3959/4096 - borderpush);
+                aistats[1][1] = constrain(aistats[1][1], 137/4096 + borderpush, 3959/4096 - borderpush);
+                
+                //Text on top
+                if(simspeed === sim && (frameCount%10 === 0 || mode < 3)){
+                    fill(0);
+                    if (type === 0){
+                        text("Mode: AI vs. AI",300,20);
+                        text("Generation " + generation, 70, 20);
+                    }
+                    if (type === 1){
+                        text("Mode: Human vs. AI",300,20);
+                    }
+                    if (type === 2){
+                        text("Mode: Human vs Human",300,20);
+                    }
+                }
+                
+                //Draw the bullets
+                if(simspeed === sim && (frameCount%10 === 0 || mode < 3)){
+                    bullet1(bstats[0][0], bstats[0][1]);
+                    bullet2(bstats[1][0], bstats[1][1]);
+                }
+                
+                //Bullet movement and collisions
+                for(var i = 0; i < 2; i++){
+                    //Bullet-Player collisions
+                    if (bstats[i][0] > aistats[i^1][0] - 1/50 && bstats[i][0] < aistats[i^1][0] + 1/50 && bstats[i][1] > aistats[i^1][1] - 1/50 && bstats[i][1] < aistats[i^1][1] + 1/50){
+                        bstats[i][0] = aistats[i][0];
+                        bstats[i][1] = aistats[i][1];
+                        bstats[i][2] = atan2(aistats[i][1] - aistats[i^1][1], aistats[i][0] - aistats[i^1][0]);
+                        aistats[i^1][2] -= dmg;
+                    }
+                    //Bullet-Wall collisions
+                    if(bstats[i][0] < 1/50 + borderpush || bstats[i][0] > 49/50 - borderpush || bstats[i][1] < 1/50 + borderpush || bstats[i][1] > 49/50 - borderpush){
+                        bstats[i][0] = aistats[i][0];
+                        bstats[i][1] = aistats[i][1];
+                        bstats[i][2] = atan2(aistats[i][1] - aistats[i^1][1], aistats[i][0] - aistats[i^1][0]);
+                    }
+                    //Bullet movement
+                    bstats[i][0] -= round(8192 * bulletspeed * cos(bstats[i][2]))/8192;
+                    bstats[i][1] -= round(8192 * bulletspeed * sin(bstats[i][2]))/8192;
+                }
+                
+                //Draw the lines
+                if(devtools && simspeed === sim && (frameCount%10 === 0 || mode < 3) && type === 0){
+                    fill(0);
+                    for(var i = 0; i < obotnum; i++){
+                        rect(0, 2 * i, 20 * obotpoints[i], 2);
+                    }
+                    //80% win
+                    fill(255, 0, 255);
+                    rect(320, 0, 1, 600);
+                    //66.7% win
+                    fill(0, 0, 255);
+                    rect(160, 0, 1, 600);
+                    //50% win
+                    fill(0, 255, 0);
+                    rect(80, 0, 1, 600);
+                    //40% win
+                    fill(255, 255, 0);
+                    rect(160/3, 0, 1, 600);
+                    //25% win
+                    fill(255, 100, 0);
+                    rect(80/3, 0, 1, 600);
+                    //10% win
+                    fill(255, 0, 0);
+                    rect(80/9, 0, 1, 600);
+                    //2% win
+                    fill(255, 255, 255);
+                    rect(80/49, 0, 1, 600);
+                }
+                
+                //Shrinking arena
+                if(borderpush < 7/16){
+                    borderpush += 1/8192;
+                }
+                
+                //If a player's hp goes below 0
+                if(aistats[0][2] < 0.01){
+                    end = true;
+                }
+                else if(simspeed === sim && (frameCount % 10 === 0 || mode < 3)){
+                    player1(aistats[0][0], aistats[0][1], aistats[0][2]);
+                }
+                if(aistats[1][2] < 0.01){
+                    end = true;
+                }
+                else if(simspeed === sim && (frameCount % 10 === 0 || mode < 3)){
+                    player2(aistats[1][0], aistats[1][1], aistats[1][2]);
+                }
+                
+                //If a bot wins
+                if(end){
+                    if(type !== 0){
+                        frameRate(1);
+                        simspeed = -1;
+                    }
+                    reset();
+                    if(pair === 0 && type === 0){
+                        superreset();
+                    }
+                }
+            }
+            
+            //Controls
+            if(type === 0){
+                if(keys[49]){
+                    frameRate(5);
+                    simspeed = 1;
+                    mode = 0;
+                }
+                if(keys[50]){
+                    frameRate(30);
+                    simspeed = 1;
+                    mode = 1;
+                }
+                if(keys[51]){
+                    frameRate(60);
+                    simspeed = 5;
+                    mode = 2;
+                }
+                if(keys[52]){
+                    frameRate(max);
+                    simspeed = 500;
+                    mode = 3;
+                }
+            }
+        }
+        
+        //debug
+        {
+            if(1 === 0){
+                lock = true;
+            }
+        }
+    }
+    
+    fill(0);
+    text("frameRate: " + round(this.__frameRate),530,20);
+};
+}
