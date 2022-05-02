@@ -1,0 +1,2 @@
+# firstai
+very old code
